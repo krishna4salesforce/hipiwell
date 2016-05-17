@@ -1,0 +1,599 @@
+/*******************************************************************************
+Name        : HIPIContentVersionAlt
+Created By  : Pooja Thakur 
+Date        : 1st Feb
+Reason      : Controller class for SearchResultOptimized Page
+*******************************************************************************/
+public class HIPIContentVersionAlt{
+   
+    public boolean showedit{get;set;}
+    public Boolean hasWhereClause=false;
+    public String profileName{get;set;} 
+    private String sbgValue;
+    public String rrNoCriteria{get;set;}
+    public String selectedSBG{get;set;}
+    public integer RECORD_LIMIT= 25;
+    Public Boolean ShowResult {get;set;}
+    public boolean showresultpanel;
+    public integer Consize;
+    //private integer list_size = 5;
+    public string OFFSET_LIMIT='2000';
+    public Boolean hasResults {get; set;}
+    public ContentVersion ConVersion{get; set;}
+    public ApexPages.StandardSetController ContSet;   
+    //public integer total_size{get;set;} //used to show user the total size of the list
+   // private integer counter=0;  //keeps track of the offset
+    private Integer PAGE_SIZE; //sets the page size or number of rows
+    public boolean childpageRen{get;set;}
+    private String sortDirection = 'ASC';
+    private String sortExp = 'id';
+    public String searchQuery='';
+    public string SBG {get;set;}
+    public string ContractNum {get;set;}
+    public string Licensee {get;set;}
+    public string CatType {get;set;}
+    public string CatSubType {get;set;}
+    public string Inputtxt {get;set;}
+    public string ContractType {get;set;}
+    public string ExpCtrl {get;set;}
+    public Date FrmDate {get;set;}
+    public Date Todate{get;set;}
+    public string ContSubType {get;set;}
+    public string Keywrd {get;set;}
+    public transient List<ContentVersion> CntVer{get;set;}
+    public integer counter=0;  //keeps track of the offset
+    public integer list_size=25; //sets the page size or number of rows
+    public integer total_size; //used to show user the total size of the list  
+    
+   public List<ContentVersionWrapper> CVWrapper{
+    get
+    {         
+    if (selectedPage != '0') {
+    counter = list_size*integer.valueOf(selectedPage)-list_size; 
+    //CVWrapper.clear();
+    }
+    
+        
+        CVWrapper = new List<ContentVersionWrapper>();
+        for (ContentVersion cv1 : database.query(searchQuery + ' limit '+ list_size  + ' OFFSET '+ counter) ) {            
+            boolean canAddEdit=false;
+            // Logic for CanEdit
+            //Contract Admin profile has access to Finance and Approvals category type. No other profile has access to any other category type except Sys Admin
+            if(userObj.Profile.Name.equalsIgnoreCase('System Administrator') || userObj.Profile.Name.equalsIgnoreCase('Contract Admin')){
+                canAddEdit=true;    
+            }
+            else {
+                    if(cv1.Category_Type__c == 'Financial' || cv1.Category_Type__c == 'Correspondence' ) {
+                     canAddEdit= true;
+                    }                    
+            } 
+            CVWrapper.add(new ContentVersionWrapper(cv1,canAddEdit));            
+        }
+        system.debug('CVWrapper>>>>>'+CVWrapper);
+        
+        //+ ' order by ' + sortFullExp + ' limit '+ list_size  + ' OFFSET '+ counter
+    
+    return CVWrapper;
+    }     
+    
+    set;}
+   
+    /*public List<ContentVersionWrapper> getCVWrapper() {
+        CVWrapper = new List<ContentVersionWrapper>();
+        for (ContentVersion cv1 : CntVer )
+            CVWrapper.add(new ContentVersionWrapper(cv1));
+        system.debug('CVWrapper>>>>>'+CVWrapper);
+        return CVWrapper;
+    }*/
+    String cid= '';
+    public Boolean isGeneric{get;set;}
+     List<account> accountList = new List<account>();//get all the account Names
+     List<Contract> ContractList = new List<Contract>();//get all the account Names
+    public HIPIContentVersionAlt(){
+        showedit = false;
+        ShowResult = false;
+        showresultpanel = false;
+        RECORD_LIMIT = 10000;
+        User Usr = new User();
+        childpageRen = false;
+        ConVersion = new ContentVersion ();
+        //total_size = [select count() from ContentVersion where Contract__c <> NULL];
+        //total_size =  10;     
+        sbgValue = [SELECT SBG__c FROM User WHERE Id = : UserInfo.getUserId()][0].SBG__c;
+        profileName  = [select name from profile where id =:userInfo.getProfileID()][0].name;
+        system.debug('Profile Name in controller' + profileName);
+        accountList = [SELECT Id,Name,RecordType.Name FROM Account WHERE RecordType.Name ='HIPI LMS Account' ORDER BY name asc];
+        ContractList= [SELECT Id, Name , RecordType.Name FROM Contract ORDER BY name asc];
+        CntVer  = new List<ContentVersion>();
+        total_size = 0;
+        selectedPage='0';
+    }
+    // Wrapper class for Content Version
+    
+    
+    public class ContentVersionWrapper{        
+        public Boolean checked{ get; set; }
+        public Boolean canAddEdit{ get; set; }        
+        public ContentVersion ConVerWrObj{get; set;}        
+        public ContentVersionWrapper(ContentVersion cv2, Boolean canAddEdit){
+            ConVerWrObj = cv2;
+            checked = false;
+            this.canAddEdit = canAddEdit;
+        }
+    }
+     public Pagereference SearchContent(){
+        return null;
+     }
+     public Pagereference AddContent()
+     {
+        return null;
+     }
+     User userObj = [SELECT UserRole.Name, Profile.Name FROM User where ID = :UserInfo.getUserId() LIMIT 1];
+      public void searchDocs(){
+      
+      childpageRen = true;
+      system.debug('inside SearchDocs Loop');
+        hasWhereClause=false;
+        String subECSubqyery = '';
+        Boolean hasECwhereclause = false;
+        String whereStr = '';
+        System.debug('profileName  >>>>>>>>>>> '+profileName);
+       
+        System.debug('Content CatType '+ CatType);
+           // User userObj = [SELECT UserRole.Name, Profile.Name FROM User where ID = :UserInfo.getUserId() LIMIT 1];
+            if(userObj.Profile.Name.equalsIgnoreCase('System Administrator')||userObj.Profile.Name.equalsIgnoreCase('Contract Admin') ||userObj.Profile.Name.equalsIgnoreCase('Accounting') ||userObj.Profile.Name.equalsIgnoreCase('Finance Analyst')||userObj.Profile.Name.equalsIgnoreCase('Accounts Receivables')){
+              showedit =  true;
+            }  
+        // If SBG is entered
+        system.debug('Search Query in mail Search' + searchQuery);
+        system.debug('ConVersion  SBG' + ConVersion.SBG__c);
+        system.debug('ConVersion  ContractNum' + ConVersion.Contract__c);
+        system.debug('ConVersion  Contract_Type__c' + ConVersion.Contract_Type__c);
+        //system.debug('ConVersion  SBG' + ConVersion.SBG__c);
+        system.debug('ConVersion  Category_Type__c' + ConVersion.Category_Type__c);
+        if((ConVersion.SBG__c== null || ConVersion.SBG__c== '') && (ConVersion.Category_Sub_Type__c== null || ConVersion.Category_Sub_Type__c== '') && (ConVersion.Exp_Ctrl__c== null || ConVersion.Exp_Ctrl__c== '') && (ContractNum == null || ContractNum== '') && (ConVersion.Contract_Type__c== null || ConVersion.Contract_Type__c== '') && (ConVersion.Category_Type__c== null || ConVersion.Category_Type__c== '')&& (ConVersion.Contract_SubType__c== null || ConVersion.Contract_SubType__c == '') && (Licensee== null || Licensee== '') && (ConVersion.End_Date__c== null) && (ConVersion.Add_Date__c== null) && (Inputtxt== null || Inputtxt== '')  )
+        {
+            ApexPages.addMessage(new ApexPages.message(ApexPages.severity.ERROR,'Please select a Value'));
+        }
+        Else{
+            searchQuery = 'SELECT Id,SBG__c,Contract__c,FileType,Contract__r.ContractNumber,Contract__r.Category__c,Contract__r.Type__c ,CreatedDate,PartyName__c,Contract__r.Contract_SBG__c,Category_Type__c,Category_Sub_Type__c,Contract__r.Account_Name__c,Exp_Ctrl__c,Description__c,Add_Date__c'+' from ContentVersion where ';
+          
+         if (ConVersion.SBG__c!= null && ConVersion.SBG__c!= ''){
+         System.debug('### Has Caluse: ' + haswhereclause);
+                hasWhereClause = true;
+                searchQuery = searchQuery + ' Contract__r.Contract_SBG__c =\'' + ConVersion.SBG__c+ '\'';    
+                }                   
+           
+        
+        //If Contract Number is enetered
+        if(ContractNum != null && ContractNum != '')
+        {
+            System.debug('### Has Caluse: ' + haswhereclause);
+            system.debug('ContractNumber ' + ContractNum);
+            if(!hasWhereClause){
+                hasWhereClause = true;
+                searchQuery = searchQuery + 'Contract__r.ContractNumber Like \'%' + ContractNum+ '%\'';    
+                }                   
+            else{
+                searchQuery = searchQuery + ' AND Contract__r.ContractNumber Like \'%' + ContractNum + '%\'';                
+            }
+        }
+        /*if (ConVersion.Contract__c!= null){
+         System.debug('### ConVersion.Contract__c ' + ConVersion.Contract__c);
+         System.debug('### ConVersion ContractNumber ' + ConVersion.Contract__r.ContractNumber);
+            Contract ctr = new Contract();
+            ctr = [SELECT ContractNumber from Contract where Id = : ConVersion.Contract__c];
+            if(!hasWhereClause){
+                hasWhereClause = true;
+                searchQuery = searchQuery + 'Contract__r.ContractNumber =\'' + ctr.ContractNumber+ '\'';    
+                }                   
+            else{
+                searchQuery = searchQuery + ' AND Contract__r.ContractNumber =\'' + ctr.ContractNumber+ '\'';                
+            }
+        } */
+        //Contract Subtype on entered
+        
+        if (ConVersion.Contract_SubType__c!= null && ConVersion.Contract_SubType__c!= ''){
+         System.debug('### Has Caluse: ' + haswhereclause);
+            
+            if(!hasWhereClause){
+                hasWhereClause = true;
+                searchQuery = searchQuery + 'Contract__r.Sub_Type__c =\'' + ConVersion.Contract_SubType__c+ '\'';    
+                }                   
+            else{
+                searchQuery = searchQuery + ' AND Contract__r.Sub_Type__c =\'' + ConVersion.Contract_SubType__c + '\'';                
+            }
+        }
+        //If ExpControl is entered :
+         if (ConVersion.Exp_Ctrl__c != null && ConVersion.Exp_Ctrl__c!= ''){
+         System.debug('### Has Caluse: ' + haswhereclause);
+            system.debug('Export Controlled Value' + ConVersion.Exp_Ctrl__c);
+            if(!hasWhereClause){
+                hasWhereClause = true;
+                searchQuery = searchQuery + 'Contract__r.Is_Export_Control__c =\'' + ConVersion.Exp_Ctrl__c+ '\'';
+                }                   
+            else{
+                searchQuery = searchQuery + 'AND Contract__r.Is_Export_Control__c =\'' + ConVersion.Exp_Ctrl__c+ '\'';                
+            }
+        }
+        
+        //If Sub cat Type is entered :
+        if (ConVersion.Category_Sub_Type__c!= null && ConVersion.Category_Sub_Type__c!= ''){
+         System.debug('### Has Caluse: ' + haswhereclause);
+            
+            if(!hasWhereClause){
+                hasWhereClause = true;
+                searchQuery = searchQuery + 'Category_Sub_Type__c =\'' + ConVersion.Category_Sub_Type__c+ '\''; 
+                }                   
+            else{
+                searchQuery = searchQuery + 'AND Category_Sub_Type__c =\'' + ConVersion.Category_Sub_Type__c+ '\'';            
+            }
+        }
+        //If Lincesee is entered
+        if (Licensee!= null && Licensee!= ''){
+         System.debug('### Has Caluse: ' + haswhereclause);
+            
+            if(!hasWhereClause){
+                hasWhereClause = true;
+                searchQuery = searchQuery + 'Contract__r.Account_Name__c Like \'%' + Licensee+ '%\'';    
+                }                   
+            else{
+                searchQuery = searchQuery + ' AND Contract__r.Account_Name__c Like \'%' + Licensee + '%\'';                
+            }
+        }
+        //If Export Control is entered 
+        
+        //if Contract Type is entered
+        if (ConVersion.Contract_Type__c!= null && ConVersion.Contract_Type__c!= ''){
+         System.debug('### Has Caluse: ' + haswhereclause);
+            
+            if(!hasWhereClause){
+                hasWhereClause = true;
+                searchQuery = searchQuery + 'Contract__r.Type__c =\'' + ConVersion.Contract_Type__c+ '\'';    
+                }                   
+            else{
+                searchQuery = searchQuery + ' AND Contract__r.Type__c =\'' + ConVersion.Contract_Type__c + '\'';                
+            }
+        }
+        //If CatType Type is entered 
+        if (ConVersion.Category_Type__c!= null && ConVersion.Category_Type__c!= ''){
+         System.debug('### Has Caluse: ' + haswhereclause);
+            if(!hasWhereClause){
+                hasWhereClause = true;
+                searchQuery = searchQuery + 'Category_Type__c =\'' + ConVersion.Category_Type__c+ '\'';    
+                }                   
+            else{
+                searchQuery = searchQuery + ' AND Category_Type__c =\'' + ConVersion.Category_Type__c + '\'';                
+            }
+        }
+         //If description is entered 
+        if (Inputtxt!= null && Inputtxt!= ''){
+         System.debug('### Has Caluse: ' + haswhereclause);
+            if(!hasWhereClause){
+                hasWhereClause = true;
+                 searchQuery = searchQuery + 'Description__c  Like \'%' + Inputtxt+ '%\'';  
+                }                   
+            else{
+                searchQuery = searchQuery + ' AND Description__c  Like \'%' + Inputtxt + '%\'';               
+            }
+        }
+        system.debug('Search Query in mail Search' + searchQuery);
+        //if((FrmDate !=null && FrmDate !='') && (Todate != null && Todate != ''))
+        if(ConVersion.Add_Date__c != null && ConVersion.End_Date__c != null)
+        {
+            system.debug('>>>>>>>>>frm::'+ConVersion.Add_Date__c );
+            system.debug('>>>>>>>>to::'+ ConVersion.End_Date__c);
+            if(ConVersion.Add_Date__c == ConVersion.End_Date__c){
+                
+                Integer from_Year = ConVersion.Add_Date__c.year();
+                Integer from_Month = ConVersion.Add_Date__c.month();
+                Integer from_Day = ConVersion.Add_Date__c.Day();
+                Integer to_Year = ConVersion.Add_Date__c.year();
+                Integer to_Month = ConVersion.Add_Date__c.month();
+                Integer to_Day = ConVersion.Add_Date__c.Day();
+                String from_Year1;
+                if(from_Year<10){
+                    from_Year1 = '0'+from_Year;
+                }else{
+                    from_Year1 = ''+from_Year;
+                }
+                String from_Month1;
+                if(from_Month<10){
+                    from_Month1 = '0'+from_Month;
+                }else{
+                    from_Month1 = ''+from_Month;
+                }
+                String from_Day1;
+                if(from_Day<10){
+                    from_Day1 = '0'+from_Day;
+                }else{
+                    from_Day1 = ''+from_Day;
+                }
+                String to_Year1;
+                if(to_Year<10){
+                    to_Year1 = '0'+to_Year;
+                }else{
+                    to_Year1 = ''+to_Year;
+                }
+                String to_Month1;
+                if(to_Month<10){
+                    to_Month1 = '0'+to_Month;
+                }else{
+                    to_Month1 = ''+to_Month;
+                }
+                String to_Day1;
+                if(to_Day<10){
+                    to_Day1 = '0'+to_Day;
+                }else{
+                    to_Day1 = ''+to_Day;
+                }               
+                //string stringDate = ConVersion.Add_Date__c.year() + '-' + ConVersion.Add_Date__c.month() + '-' + ConVersion.Add_Date__c.day() + 'T'+ '00' + ':' + '00' +  ':' + '01' + '.'+'000'+'+0000'; 
+                //string stringDate1 = ConVersion.End_Date__c.year() + '-' + ConVersion.End_Date__c.month() + '-' + ConVersion.End_Date__c.day() + 'T'+ '23' + ':' + '59' +  ':' + '59' + '.'+'000'+'+0000';    
+                //string stringDate = '2016' + '-' + '04' + '-' + '02' + 'T'+ '00' + ':' + '00' +  ':' + '01' + '.'+'000'+'+0000';  
+                //string stringDate1 = '2016' + '-' + '04' + '-' + '02' + 'T'+ '23' + ':' + '59' +  ':' + '59' + '.'+'000'+'+0000'; 
+                string stringDate = from_Year1 + '-' + from_Month1 + '-' + from_Day1 + 'T'+ '00' + ':' + '00' +  ':' + '01' + '.'+'000'+'+0000';    
+                string stringDate1 = to_Year1 + '-' + to_Month1 + '-' + to_Day1 + 'T'+ '23' + ':' + '59' +  ':' + '59' + '.'+'000'+'+0000';                 
+                system.debug('stringDate>>>>>>>> '+stringDate);
+                system.debug('stringDate1>>>>>>>> '+stringDate1);
+                if(!hasWhereClause){
+                    hasWhereClause = true;
+                    searchQuery = searchQuery + ' createdDate >=' + stringDate + ' AND createdDate <=' + stringDate1 + '';
+                }else{
+                    searchQuery = searchQuery + ' AND createdDate >=' + stringDate + ' AND createdDate <=' + stringDate1 + '';
+                }
+                
+            }else{      
+       
+                if(!hasWhereClause)
+                {
+                hasWhereClause = true;
+                searchQuery = searchQuery + ' Created_Date__c >=' + ConVersion.Add_Date__c  + ' AND Created_Date__c <=' + ConVersion.End_Date__c + '' ; 
+                }
+                else{
+                searchQuery = searchQuery + ' AND Created_Date__c >=' + ConVersion.Add_Date__c  +' AND Created_Date__c <=' + ConVersion.End_Date__c + '' ;
+                }
+                searchQuery = searchQuery.replace('00:00:00','');
+            }
+        }
+        system.debug('Search Query in mail Search' + searchQuery);
+        
+        
+        system.debug('sortExpression in Search Content'+sortExpression);
+        string sortFullExp = sortExpression + ' ' + sortDirection;
+        system.debug('--RECORD_LIMIT--'+RECORD_LIMIT +'--counter--'+counter);
+      //searchQuery = searchQuery + ' Limit ' + RECORD_LIMIT;
+        
+       //searchQuery = searchQuery + ' order by ' + sortFullExp + ' limit '+ list_size  + ' OFFSET '+ counter ;
+       searchQuery = searchQuery + ' order by ' + sortFullExp ;
+        System.debug('### accountQuery: ' + searchQuery);
+        system.debug('searchQuery inside main method' + searchQuery);
+        
+      
+        CntVer = database.query(searchQuery);
+        Consize = CntVer.size();
+        }
+        //system.debug('CntVer Size' + CntVer.size());
+       // total_size = CntVer.size();
+       /**to check the record sixe is greater than 2000 as bcz of limit of salesforce on offset **/
+       
+        system.debug('total Size' + total_size);
+        try{
+        if(CntVer.size() > 0 && CntVer.size() <= 2000 ){
+         ShowResult = TRUE;
+         //showresultpanel = true;
+        }
+        else if(CntVer.size() > 2000){
+        ApexPages.addmessage(new ApexPages.message(ApexPages.severity.INFO,'More than 2000 records found please add some other criteria to search the content. (Total Contents are '+ Consize + ')'));  
+        ShowResult = true;//false;
+        //searchQuery = searchQuery + ' order by ' + ConVersion.CreatedDate + ' DESC ' + '\'';
+        //searchQuery = searchQuery + ' order by ' + CreatedDate + '\'';
+        integer recordLimit = 2000;
+        CntVer = database.query(searchQuery + ' limit ' + recordLimit );
+        }
+        else
+        {
+        ShowResult = false;
+        ApexPages.addmessage(new ApexPages.message(ApexPages.severity.INFO,'No Records Found'));
+        
+        }
+        total_size = CntVer.size();
+        selectedPage='1';
+        }
+        catch(exception e){
+        ApexPages.addmessage(new ApexPages.message(ApexPages.severity.INFO,'No Content Found'));
+        }
+        
+       
+    }
+    
+    
+    //End of SearchContent Method.
+    
+
+        
+    public string selectedPage{get;set{selectedPage=value;}
+    }
+    
+    
+    public Component.Apex.pageBlockButtons getMyCommandButtons() {
+        
+        //the reRender attribute is a set NOT a string
+        Set<string> theSet = new Set<string>();
+        theSet.add('myPanel');
+        theSet.add('myButtons');
+                
+        integer totalPages;
+        if (math.mod(total_size, list_size) > 0) {
+            totalPages = total_size/list_size + 1;
+        } else {
+            totalPages = (total_size/list_size);
+        }
+        
+        integer currentPage;        
+        if (selectedPage == '0') {
+            currentPage = counter/list_size + 1;
+        } else {
+            currentPage = integer.valueOf(selectedPage);
+        }
+     
+        Component.Apex.pageBlockButtons pbButtons = new Component.Apex.pageBlockButtons();        
+        pbButtons.location = 'top';
+        pbButtons.id = 'myPBButtons';
+        
+        Component.Apex.outputPanel opPanel = new Component.Apex.outputPanel();
+        opPanel.id = 'myButtons';
+                                
+        //the Previous button will alway be displayed
+        Component.Apex.commandButton b1 = new Component.Apex.commandButton();
+        b1.expressions.action = '{!Previous}';
+        b1.title = 'Previous';
+        b1.value = 'Previous';
+        b1.expressions.disabled = '{!disablePrevious}';        
+        b1.reRender = theSet;
+
+        opPanel.childComponents.add(b1);        
+                        
+        for (integer i=0;i<totalPages;i++) {
+            Component.Apex.commandButton btn = new Component.Apex.commandButton();
+            
+            if (i+1==1) {
+                btn.title = 'First Page';
+                btn.value = 'First Page';
+                btn.rendered = true;                                        
+            } else if (i+1==totalPages) {
+                btn.title = 'Last Page';
+                btn.value = 'Last Page';
+                btn.rendered = true;                            
+            } else {
+                btn.title = 'Page ' + string.valueOf(i+1) + ' ';
+                btn.value = ' ' + string.valueOf(i+1) + ' ';
+                btn.rendered = false;             
+            }
+            
+            if (   (i+1 <= 5 && currentPage < 5)
+                || (i+1 >= totalPages-4 && currentPage > totalPages-4)
+                || (i+1 >= currentPage-2 && i+1 <= currentPage+2))
+            {
+                btn.rendered = true;
+            }
+                                     
+            if (i+1==currentPage) {
+                btn.disabled = true; 
+                btn.style = 'color:blue;';
+            }  
+            
+            btn.onclick = 'queryByPage(\''+string.valueOf(i+1)+'\');return false;';
+                 
+            opPanel.childComponents.add(btn);
+            
+            if (i+1 == 1 || i+1 == totalPages-1) { //put text after page 1 and before last page
+                Component.Apex.outputText text = new Component.Apex.outputText();
+                text.value = '...';        
+                opPanel.childComponents.add(text);
+            } 
+             
+        }
+        
+        //the Next button will alway be displayed
+        Component.Apex.commandButton b2 = new Component.Apex.commandButton();
+        b2.expressions.action = '{!Next}';
+        b2.title = 'Next';
+        b2.value = 'Next';
+        b2.expressions.disabled = '{!disableNext}';        
+        b2.reRender = theSet;
+        opPanel.childComponents.add(b2);
+                
+        //add all buttons as children of the outputPanel                
+        pbButtons.childComponents.add(opPanel);  
+  
+        return pbButtons;
+
+    }    
+    
+    public PageReference refreshGrid() { //user clicked a page number        
+        system.debug('**** ' + selectedPage);
+        return null;
+    }
+    
+    public PageReference Previous() { //user clicked previous button
+        selectedPage = '0';
+        counter -= list_size;
+        return null;
+    }
+
+    public PageReference Next() { //user clicked next button
+        selectedPage = '0';
+        counter += list_size;
+        return null;
+    }
+
+    public PageReference End() { //user clicked end
+        selectedPage = '0';
+        counter = total_size - math.mod(total_size, list_size);
+        return null;
+    }
+    
+    public Boolean getDisablePrevious() { //this will disable the previous and beginning buttons
+        if (counter>0) return false; else return true;
+    }
+
+    public Boolean getDisableNext() { //this will disable the next and end buttons
+        if (counter + list_size < total_size) return false; else return true;
+    }
+
+    public Integer getTotal_size() {
+        return total_size;
+    }
+    
+    public Integer getPageNumber() {
+        return counter/list_size + 1;
+    }
+
+    public Integer getTotalPages() {
+        if (math.mod(total_size, list_size) > 0) {
+            return total_size/list_size + 1;
+        } else {
+            return (total_size/list_size);
+        }
+    }
+  
+    /**Method to refresh the Whole page**/
+      public PageReference refresh(){
+        PageReference pageRef = new pageReference('/apex/HIPIVirtualFileRoom'); 
+        pageRef.setRedirect(true);
+        return pageRef;
+        }
+   
+        
+    
+    /**Ended of Pagination with Offset**/
+   
+    public String getSortDirection()
+    {
+    //if not column is selected 
+        if (sortExpression == null || sortExpression == '')
+        return 'ASC';
+        else
+        return sortDirection;
+    }
+
+    public String sortExpression
+    {
+        get
+        {
+        return sortExp;
+        }
+        set
+        {
+        //if the column is clicked on then switch between Ascending and Descending modes
+        if (value == sortExp)
+        sortDirection = (sortDirection == 'ASC')? 'DESC' : 'ASC';
+        else
+        sortDirection = 'ASC';
+        sortExp = value;
+        }
+    }
+    
+   
+    
+}
