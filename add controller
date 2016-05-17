@@ -1,0 +1,213 @@
+public class HIPIAddCtr{  
+   
+   public ContentVersion CV_Old{get;set;}
+   public ContentVersion objOfCV{get;set;}
+   public ContentVersion CVToShowForAdd{get;set;}
+   public transient ContentVersion CV_New;
+   public ContentWorkspace CW{get;set;}
+   Public Transient blob InPutfile{get;set;}
+   Public Id ConverID{get;set;}
+   public string fileFormatedtitle;
+   public Id ConverIDToAdd{get;set;}
+   public boolean IsEdit{get;set;}
+   public boolean IsError;
+   public boolean IsAdd{get;set;}
+   public boolean IsSave{get;set;}
+   public String contractNumber {get;set;}      
+   public Transient blob versionData{get;set;}
+   public String fileName{get;set;}
+   public String Title{get;set;}   
+   public String selectedConWSName{get;set;}
+   public String selectedContFiles{get;set;}   
+   public String pageTitle{get;set;}
+      
+            
+       public HIPIAddCtr (){
+               ConverID = ApexPages.CurrentPage().getParameters().get('CVId');
+               ConverIDToAdd = ApexPages.CurrentPage().getParameters().get('CVIdAdd');
+               CV_Old = new ContentVersion();
+               objOfCV = new ContentVersion();
+               CVToShowForAdd = new ContentVersion();
+               IsEdit = false;               
+               IsAdd = false;
+               IsError = false;
+               pageTitle = 'Add Content';   
+                
+               ////If ContentVersionId is not null 
+               if(ConverID != null){
+                   IsEdit = true;                                 
+                    pageTitle = 'Edit Content'; 
+                
+                   CV_Old = [select id, ContentUrl, PathonClient, Description, ContentDocument.ParentId, Contract__r.ContractNumber, Contract__r.Is_Export_Control__c, Contract__r.Type__c, Contract__r.Sub_Contract_Type__c, Contract__r.Contract_SBG__c, Contract__r.Account_Name__c, Title,FirstPublishLocationId,PublishStatus, Origin,Category_Type__c,Category_Sub_Type__c,Contract__c  from contentversion where id =: ConverID limit 1];
+                   if(CV_Old != null && (CV_Old.FirstPublishLocationId != null || CV_Old.FirstPublishLocationId != '')){
+                       CW = [select  Id,name from ContentWorkspace where id =: CV_Old.ContentDocument.ParentId]; //ContentWorkSpace Name and ID are selected
+                   }
+
+               }
+                                
+               if(ConverIDToAdd != null) {
+                    IsAdd = true;
+                    CV_Old = [select id, ContentUrl, PathonClient,ContentDocument.ParentId, Contract__r.Contract_SBG__c, Title,FirstPublishLocationId,PublishStatus, Origin,Category_Type__c,Category_Sub_Type__c,Contract__c  from contentversion where id =: ConverIDToAdd limit 1];
+                    if(CV_Old != null && (CV_Old.FirstPublishLocationId != null || CV_Old.FirstPublishLocationId != '')){
+                       CW = [select  Id,name from ContentWorkspace where id =: CV_Old.ContentDocument.ParentId]; //ContentWorkSpace Name and ID are selected
+                   }                 
+               } 
+                
+                              
+            }
+            
+       //Get all libraries name in picklist     
+       public List<SelectOption> getConWSNames() {                           
+ 
+              List<SelectOption> conOptions= new List<SelectOption>();
+              
+              conOptions.add( new SelectOption('','--Select--'));
+              for( ContentWorkspace con : [select Id,name from ContentWorkspace where Name LIKE '%LMS%'] ) {
+                      conOptions.add( new SelectOption(con.Name,con.name));
+              }
+             return conOptions;
+       }
+       
+   
+    //Save method to add and update 
+    public PageReference SaveContentversion() {
+        // Comman code        
+        // Method for inserting new contentVersion        
+        // Method for editing Contetntversion
+                                                  
+        
+                //If ContentVersionId is not null and ContentVersion has data        
+         if(IsEdit && CV_Old != null && ConverID != null){
+                    //If Library name is selected  and add new record                     
+            if(CV_Old.Contract__c != null ){   
+                    CV_New =  new ContentVersion();
+                    fileFormatedtitle = CV_Old.Contract__r.ContractNumber + '_' + CV_Old.Contract__r.Account_Name__c;
+                	system.debug('CV_Old.PathOnClient>>>'+CV_Old.PathOnClient + 'fileName>>>'+fileName);
+                    if(InPutfile != null) {
+                        CV_New.Title = fileFormatedtitle;
+                        CV_New.PathOnClient = fileName;
+                        CV_New.VersionData= InPutfile;
+                        CV_New.ContentUrl = CV_Old.ContentUrl;
+                    }
+                    else{
+                        CV_New.Title = fileFormatedtitle;
+                        CV_New.PathOnClient = CV_Old.PathOnClient;
+                        CV_New.VersionData= CV_Old.VersionData;
+                        CV_New.ContentUrl = CV_Old.ContentUrl;                      
+                    }
+                    CV_New.Contract__c = CV_Old.Contract__c;
+                    CV_New.Category_Type__c = CV_Old.Category_Type__c;
+                    CV_New.Category_Sub_Type__c = CV_Old.Category_Sub_Type__c;
+                    CV_New.Description = objOfCV.Description;                      
+                    CV_New.SBG__c = CV_Old.Contract__r.Contract_SBG__c;
+                    CV_New.Contract_Type__c = CV_Old.Contract__r.Type__c;
+                    CV_New.Contract_SubType__c = CV_Old.Contract__r.Sub_Contract_Type__c;
+                    CV_New.Exp_Ctrl__c = CV_Old.Contract__r.Is_Export_Control__c;
+                    insert  CV_New;
+                    ContentVersion insertContent = [SELECT ContentDocumentId FROM ContentVersion where Id = :CV_New.Id];
+                               
+                    ContentWorkspace insertWorkspace = [SELECT Id FROM ContentWorkspace WHERE Name = : CW.Name];
+                    ContentWorkspaceDoc insertWorkSpaceDoc = new ContentWorkspaceDoc();        
+                    insertWorkSpaceDoc.ContentWorkspaceId = insertWorkspace.Id;
+                        
+                    insertWorkSpaceDoc.ContentDocumentId = insertContent.ContentDocumentId;        
+                    insert insertWorkSpaceDoc ;
+                    
+                   ContentVersion contentDocId = [SELECT ContentDocumentId FROM ContentVersion where Id = : CV_Old.Id];
+                   contentdocument CD_ToDelete = [SELECT Id FROM contentdocument where Id = : contentDocId.ContentDocumentId ];
+                   Delete CD_ToDelete;            
+                   IsError = True;
+                   ApexPages.addmessage(new ApexPages.message(ApexPages.severity.CONFIRM,'The document has been uploaded sucessfully.'));      
+            }
+            else {            
+                ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.Error,'Please select a contractNumber'));
+                return null;
+                }                                       
+        } 
+        else {
+                     //If Library name is selected  and add new record 
+                if(InPutfile != null){
+                    
+                        ContentVersion insertNewContent = new ContentVersion ();
+                        ContentWorkspace insertNewWorkspace = new ContentWorkspace ();
+                        if(ConverIDToAdd == null) {                                                         
+                                    
+                                    Contract ctr = new contract();
+                                    ContentVersion CVtoInsertForAdd1 = new ContentVersion();
+                                        if(CV_Old.Contract__c != null ) {                                            
+                                            ctr = [select ContractNumber, Account_Name__c, Is_Export_Control__c, Type__c, Sub_Contract_Type__c, Contract_SBG__c from Contract where Id =: CV_Old.Contract__c];
+                                            fileFormatedtitle =  ctr.ContractNumber + '_' + ctr.Account_Name__c;
+                                            CVtoInsertForAdd1.Title = fileFormatedtitle;
+                                            CVtoInsertForAdd1.Contract__c = CV_Old.Contract__c;
+                                            CVtoInsertForAdd1.SBG__c = ctr.Contract_SBG__c;
+                                            CVtoInsertForAdd1.Contract_Type__c = ctr.Type__c;
+                                            CVtoInsertForAdd1.Contract_SubType__c = ctr.Sub_Contract_Type__c;
+                                            CVtoInsertForAdd1.Exp_Ctrl__c = ctr.Is_Export_Control__c;
+                                        }
+                                        else{
+                                            ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.Error,'Please select a ContractNumber.'));
+                                            return null;                                        
+                                        }
+                                    CVtoInsertForAdd1.versionData=InPutfile;
+                                    CVtoInsertForAdd1.pathonclient = fileName;                                    
+                                    CVtoInsertForAdd1.Category_Type__c = CV_Old.Category_Type__c;
+                                    CVtoInsertForAdd1.Category_Sub_Type__c = CV_Old.Category_Sub_Type__c;
+                                    CVtoInsertForAdd1.Description = objOfCV.Description;                                                            
+                                    insert CVtoInsertForAdd1;
+                                    String contractSbg = '%' + ctr.Contract_SBG__c + '%' ; 
+                                    insertNewContent = [SELECT ContentDocumentId FROM ContentVersion where Id = :CVtoInsertForAdd1.Id];
+                                    insertNewWorkspace = [SELECT Id FROM ContentWorkspace WHERE Name like : contractSbg ];
+                                    IsError = True;
+                        } 
+                        else {                                 
+                                ContentVersion CVtoInsertForAdd2 = new ContentVersion();
+                                Contract ctr = new contract();
+                                ctr = [select ContractNumber, Type__c, Sub_Contract_Type__c, Is_Export_Control__c, Contract_SBG__c, Account_Name__c from Contract where Id =: CV_Old.Contract__c];
+                                fileFormatedtitle =   ctr.ContractNumber + '_' + ctr.Account_Name__c;                                
+                                CVtoInsertForAdd2.Title = fileFormatedtitle;
+                                CVtoInsertForAdd2.versionData=InPutfile;
+                                CVtoInsertForAdd2.pathonclient = fileName;
+                                CVtoInsertForAdd2.Title = CV_Old.Title;
+                                CVtoInsertForAdd2.pathonclient = CV_Old.pathonclient;                                
+                                CVtoInsertForAdd2.Contract__c = CV_Old.Contract__c;
+                                CVtoInsertForAdd2.Category_Type__c = CVToShowForAdd.Category_Type__c;
+                                CVtoInsertForAdd2.Category_Sub_Type__c = CVToShowForAdd.Category_Sub_Type__c;
+                                CVtoInsertForAdd2.Contract__c = CV_Old.Contract__c; 
+                                CVtoInsertForAdd2.Description = objOfCV.Description;
+                                CVtoInsertForAdd2.SBG__c = ctr.Contract_SBG__c;
+                                CVtoInsertForAdd2.Contract_Type__c = ctr.Type__c;
+                                CVtoInsertForAdd2.Contract_SubType__c = ctr.Sub_Contract_Type__c;
+                                CVtoInsertForAdd2.Exp_Ctrl__c = ctr.Is_Export_Control__c;
+                                insert CVtoInsertForAdd2;                                
+                                
+                                insertNewContent = [SELECT ContentDocumentId FROM ContentVersion where Id = :CVtoInsertForAdd2.Id];
+                                insertNewWorkspace = [SELECT Id FROM ContentWorkspace WHERE Name =:CW.Name];                                
+                                IsError = True;                                
+                         }                    
+                                                            
+                    ContentWorkspaceDoc insertNewWorkspaceDoc = new ContentWorkspaceDoc();        
+                    insertNewWorkspaceDoc.ContentWorkspaceId = insertNewWorkspace.Id;
+                    insertNewWorkspaceDoc.ContentDocumentId = insertNewContent.ContentDocumentId;        
+                    insert insertNewWorkspaceDoc; 
+                      
+                    ApexPages.addmessage(new ApexPages.message(ApexPages.severity.CONFIRM,'The document has been uploaded sucessfully.')); 
+                }
+                else{
+                     ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.Error,'Please select a file'));
+                     return null;
+                }
+            
+            }                    
+            IsSave = IsError;            
+            return null ;
+    }
+    
+
+          
+     public Pagereference cancelContent() {
+         Pagereference pageRef = new Pagereference ('/apex/HIPIVirtualFileRoom');       
+            return pageRef;
+     }  
+ 
+       /*********************************Vindesvar Kumar : End Of The Code ************************************/            
+}
