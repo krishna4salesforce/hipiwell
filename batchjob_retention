@@ -1,0 +1,114 @@
+global class HIPIBatchJobContractRetention  implements Database.Batchable<sObject>,Schedulable{
+
+ public void execute(SchedulableContext sc) { 
+        HIPIBatchJobContractRetention  obj = new HIPIBatchJobContractRetention();
+        Database.executeBatch(obj,1);
+         }
+global database.querylocator start(Database.BatchableContext BC) { 
+               
+             String query = 'Select Id, Retention__c, contractNumber, Contract_End_Date__c,StartDate,Status__c,Old_Contract_Code__c,New_Contract_Code__c from contract where ((Status__c = \'Expired\' OR Status__c = \'Terminated\' OR Status__c = \'Bankruptcy\') AND Status__c <> \'Executed\') AND (Retention__c <> \'Delete\' AND Retention__c <> \'Retain - Other\' AND Retention__c <> \'Retain – Litigation Hold\') AND ((Old_Contract_Code__c <> null) OR (New_Contract_Code__c <> null)) AND (Contract_End_Date__c <> null)'; 
+             //String query = 'Select Id, Retention__c,Contract_End_Date__c,StartDate,Status__c,Old_Contract_Code__c,New_Contract_Code__c from contract where ((Status__c = \'Expired\' OR Status__c = \'Terminated\' OR Status__c = \'Bankruptcy\') AND Status__c <> \'Executed\') AND (Retention__c =  \'Active\' OR Retention__c =  \'Archive\' OR Retention__c =  \'\' ) AND(Contract_End_Date__c <> null)';
+             //String query = 'Select Id, Retention__c,Contract_End_Date__c,StartDate,Status__c,Old_Contract_Code__c,New_Contract_Code__c from contract where ((Status__c = \'Expired\' OR Status__c = \'Terminated\' OR Status__c = \'Bankruptcy\') AND Status__c <> \'Executed\') AND (Retention__c =  \'Active\') AND(Contract_End_Date__c <> null)';
+             return Database.getQueryLocator(query);
+            }
+       
+                        
+ global void execute(Database.BatchableContext BC, List<Contract> scope) {
+                
+            List<Contract> lstContractToUpdate = new List<Contract>();            
+            Set<ID> contRetainId = new Set<ID>();             
+            Set<String> lstOfCV_Title = new Set<String>(); 
+            set<Id> CVID = new Set<Id>();
+     
+            system.debug('scope??????'+scope);
+            /*for (Contract ct : scope) {               
+                 contRetainId.add(ct.Id);
+            }*/
+            Map<String , String> mapOfCNNew = new Map<String , String>();
+            for (Contract ct : scope) {                                
+                 mapOfCNNew.put(ct.New_Contract_Code__c,ct.contractNumber);
+            }           
+            Map<string , Contract>  mapOfCNNewStatus = new Map<string , Contract>([Select Id, contractNumber, Status__c from Contract where contractNumber IN : mapOfCNNew.keySet()]);          
+            for (Contract ct : scope) {             
+                if( ct.New_Contract_Code__c != null && ct.New_Contract_Code__c != '' ) {  
+                     system.debug('mapOfCNNewStatus.values()>>>>>>>>>>'+mapOfCNNewStatus.values());
+                    for (Contract ctNew : mapOfCNNewStatus.values()){
+                        
+                        if(ctNew.contractNumber.equals (ct.New_Contract_Code__c)){                                                                                                                       
+                              if(ctNew.Status__c != 'Executed')
+                                  contRetainId.add(ct.Id);                                
+                        }                        
+                    }                    
+                }else{
+                      contRetainId.add(ct.Id); 
+                }                                       
+            }
+            system.debug('contRetainId>>>>>>'+contRetainId);
+            List<ContentVersion> CV = [Select Id, contract__c, ContentDocumentId from ContentVersion where contract__c IN : contRetainId ];           
+     		system.debug('CV>>>>>>>>>+++++'+CV);
+            Date td = Date.today();
+            for (Contract ct : scope) {
+                if(contRetainId.contains(ct.Id)){ 
+                    Date newDate = ct.Contract_End_Date__c;
+                    Integer y = newDate.year();
+                    Integer m = newDate.month();
+                    Integer d = newDate.day();              
+                    Date contractEndDate = Date.newInstance(y, m, d);
+                    Integer numOfDays = contractEndDate.daysBetween(td);
+                    Boolean val = numOfDays>2557;
+                    system.debug('CV.size()>>>>>>>>>>>>>'+CV.size()>0+'>>>>>>>>>>>>>>>>>>>>>>>>> enddate'+contractEndDate +'no of days   ' + numOfDays+'   value' + val );
+                    
+                    if(val && CV.size() > 0)
+                    {
+                     ct.Retention__c = 'Archive';
+                     CVID.add(ct.Id);
+                     lstContractToUpdate.add(ct);
+                    }
+                    
+                }
+            }           
+            
+            
+            if(lstContractToUpdate.size()>0)
+            update lstContractToUpdate ;
+                            
+            List<ContentVersion> CV1 = [Select contract__r.Id, ContentDocumentId from ContentVersion where contract__r.Id IN : CVID AND contract__r.Retention__c = 'Archive' ];           
+            
+            Set<ID> contDocId = new Set<ID>();
+            
+            for (ContentVersion d : CV1) {
+            
+                contDocId.add(d.ContentDocumentId);
+            } 
+                        
+        
+            List<ContentDocument> CD = [Select Id, ParentId from ContentDocument where Id IN : contDocId ];
+            
+            Set<ID> CDId = new Set<ID>();
+            
+            Id  TargetWS = [select Id, Name from contentworkspace where name = 'HIPI Retention Library'].id;
+            
+            List<ContentDocument> conDocToUpd = new  List<ContentDocument>();
+            
+            for (ContentDocument c : CD) {
+            
+                    c.ParentId = TargetWS;
+                    conDocToUpd.add(c);
+            }
+            
+            if(conDocToUpd.size()>0)
+            update conDocToUpd;
+            
+        } 
+        
+        
+        
+        
+  global void finish(Database.BatchableContext BC) {
+  
+      system.debug('conDocToUpd>>>> >>>>>>>>>>>>>>>>>>>>>>>>>>>>>');
+  
+       }
+        
+        
+}
