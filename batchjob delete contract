@@ -1,0 +1,202 @@
+global class HIPIBatchJobContractRetentionDelete implements Database.Batchable<sObject> {
+
+         
+ global database.querylocator start(Database.BatchableContext BC) { 
+               
+              String query = 'select Id,contract__r.Id, contentDocumentId, contract__r.Retention__c from contentVersion where contract__r.Retention__c =\'Delete\'';
+              return Database.getQueryLocator(query);
+            }
+       
+                        
+ global void execute(Database.BatchableContext BC, List<contentVersion> contentDocId) {
+        /* Code to delete the related List of Contract which fulfill the above criteria*/              
+         Set<ID> contId1 = new Set<ID>();
+         system.debug('contentDocId>>>>>>'+contentDocId);
+       for (contentversion cv : contentDocId) {
+            contId1.add(cv.contract__c);            
+           system.debug('cv.contract__c>>>>>>'+cv.contract__c);
+        }         
+        /** To Delete the SAP CR **/
+        List<HIPI_SAP_Cash_Receipt__c> sapcr =  new List<HIPI_SAP_Cash_Receipt__c>();
+        sapcr = [select Id from HIPI_SAP_Cash_Receipt__c where Contract__c IN: contId1 ];
+        if(sapcr.size()>0)
+        DELETE sapcr;
+        system.debug('sapcr >>>>> to be deleted' + sapcr);
+        /** end To Delete the SAP CR **/
+         
+        /** To Delete the SAP Invoice **/
+        List<HIPI_SAP_Invoice__c> sapInv =  new List<HIPI_SAP_Invoice__c>();
+        sapInv = [select Id from HIPI_SAP_Invoice__c where Contract__c IN: contId1 ];
+        if(sapInv.size()>0)
+        DELETE sapInv;
+        system.debug('Invoice >>>>> to be deleted' + sapInv);
+        /** end To Delete the SAP Invoice **/
+        
+         /** To Delete the MG **/
+         set<Id> MGID = new set<Id>();
+        List<HIPI_Minimum_Guarantee__c> MGLst =  new List<HIPI_Minimum_Guarantee__c>();
+        List<HIPI_Obligation_MG_Assoc__c> OBMG =  new List<HIPI_Obligation_MG_Assoc__c>();
+        List<HIPI_Req_Rep_MG_Assoc__c> RRMG =  new List<HIPI_Req_Rep_MG_Assoc__c>();
+        MGLst = [select Id from HIPI_Minimum_Guarantee__c where Contract__c IN: contId1 ];
+        for(HIPI_Minimum_Guarantee__c MG : MGLst){
+        MGID.add(MG.Id);
+        }
+        OBMG = [select Id from HIPI_Obligation_MG_Assoc__c where Associated_MG__c IN: MGID];
+        RRMG = [select Id from HIPI_Req_Rep_MG_Assoc__c where Minimum_Guarantee__c IN: MGID];
+        if(OBMG.size()>0)
+        DELETE OBMG;
+        if(RRMG.size()>0)
+        DELETE RRMG;
+        if(MGLst.size()>0)
+        DELETE MGLst;
+        system.debug('MG  >>>>> to be deleted' + MGLst);
+        /** end To Delete the MG**/
+        
+        /** To Delete the Obligation **/
+        set<Id> OblId = new set<Id>();
+        List<HIPI_Obligation__c> Obllst =  new List<HIPI_Obligation__c>();
+        List<HIPI_Obligation_MG_Assoc__c> OBMG1 =  new List<HIPI_Obligation_MG_Assoc__c>();
+        List<HIPI_Obligation_RR_Assoc__c> OBRR =  new List<HIPI_Obligation_RR_Assoc__c>();
+        Obllst = [select Id from HIPI_Obligation__c where Contract__c IN: contId1 ];
+        for(HIPI_Obligation__c OBL : Obllst){
+        OblId.add(OBL.Id);
+        }
+        OBMG1 = [select Id from HIPI_Obligation_MG_Assoc__c where Obligation__c IN: OblId];
+        OBRR = [select Id from HIPI_Obligation_RR_Assoc__c where Obligation__c IN: OblId];
+        if(OBMG1.size()>0)
+        DELETE OBMG1;
+        if(OBRR.size()>0)
+        DELETE OBRR;
+        if(Obllst.size()>0)
+        DELETE Obllst;
+        system.debug('Obligation >>>>> to be deleted' + Obllst); 
+        /** end To Delete the Obligation**/
+        
+        /** To Delete the REquired Report **/
+        set<Id> RRId = new set<Id>();
+        List<HIPI_Required_Report__c> ReqReplst =  new List<HIPI_Required_Report__c>();
+        List<HIPI_Web_RR_Details__c> RRRoyalty =  new List<HIPI_Web_RR_Details__c>();
+        List<HIPI_Obligation_RR_Assoc__c> OBRR1 =  new List<HIPI_Obligation_RR_Assoc__c>();
+        List<HIPI_Req_Rep_MG_Assoc__c> RRMG1 =  new List<HIPI_Req_Rep_MG_Assoc__c>();
+        ReqReplst = [select Id from HIPI_Required_Report__c where Contract__c IN: contId1 ];
+        for(HIPI_Required_Report__c RR : ReqReplst)
+        {
+            RRId.add(RR.id);
+        }
+        RRMG1 = [select Id from HIPI_Req_Rep_MG_Assoc__c where Required_Report__c IN: RRId];
+        OBRR1 = [select Id from HIPI_Obligation_RR_Assoc__c where Required_Report__c IN: RRId];
+        RRRoyalty = [select Id from HIPI_Web_RR_Details__c where Required_Report__c IN: RRId];
+        if(RRRoyalty.size()>0)
+        DELETE RRRoyalty;
+        if(RRMG1.size()>0)
+        DELETE RRMG1;
+        if(OBRR1.size()>0)
+        DELETE OBRR1;
+        if(ReqReplst.size()>0)
+        DELETE ReqReplst;
+        system.debug('REquired Report >>>>> to be deleted' + ReqReplst); 
+        /** end To Delete the REquired Report**/
+        
+        /** To Delete the Scheduling **/
+        List<HIPI_Scheduling__c> Sch =  new List<HIPI_Scheduling__c>();
+        Sch = [select Id from HIPI_Scheduling__c where Contract__c IN: contId1 ];
+        if(Sch.size()>0)
+        DELETE Sch;
+        system.debug('Scheduling >>>>> to be deleted' + Sch);
+        /** end To Delete the Scheduling***/
+        
+        /** To Delete the Notes **/
+        List<HIPI_Notes__c> HIPINote =  new List<HIPI_Notes__c>();
+        HIPINote = [select Id from HIPI_Notes__c where Contract__c IN: contId1 ];
+        if(HIPINote.size()>0)
+        DELETE HIPINote;
+        system.debug('Scheduling >>>>> to be deleted' + HIPINote);
+        /** end To Delete the Notes***/
+        
+        /** To Delete the Amendment **/
+        List<HIPI_Contract_Amendment__c> Amend =  new List<HIPI_Contract_Amendment__c>();
+        Amend = [select Id from HIPI_Contract_Amendment__c where Contract__c IN: contId1 ];
+        if(Amend.size()>0)
+        DELETE Amend;
+        system.debug('Amendment >>>>> to be deleted' + Amend);
+        /** end To Delete the Amendment**/
+        
+        /** To Delete the Export Control **/
+        List<HIPI_CONTRACT_EXPORT_CONTROL__c> ExpCntrl =  new List<HIPI_CONTRACT_EXPORT_CONTROL__c>();
+        ExpCntrl = [select Id from HIPI_CONTRACT_EXPORT_CONTROL__c where HIPI_Contract__c IN: contId1 ];
+        if(ExpCntrl.size()>0)
+        DELETE ExpCntrl;
+        system.debug('export Control >>>>> to be deleted' + ExpCntrl);
+        /** end To Delete the Export Control **/
+        
+        /** To Delete the insurance **/
+        List<HIPI_Insurance_Coverage__c> Insurance =  new List<HIPI_Insurance_Coverage__c>();
+        Insurance = [select Id from HIPI_Insurance_Coverage__c where Contract__c IN: contId1 ];
+        if(Insurance.size()>0)
+        DELETE Insurance;
+        system.debug('insurance >>>>> to be deleted' + Insurance);
+        /** end To Delete the insurance **/
+        
+        /** To Delete the intellectual Property **/
+        List<HIPI_Contract_Intellectual_Property__c> intprpt =  new List<HIPI_Contract_Intellectual_Property__c>();
+        intprpt = [select Id from HIPI_Contract_Intellectual_Property__c where Contract__c IN: contId1 ];
+        if(intprpt.size()>0)
+        DELETE intprpt;
+        system.debug('intellectual Property  >>>>> to be deleted' + intprpt);
+        /** end To Delete the HIPI_Contract_Intellectual_Property__c **/
+        
+        /** To Delete the Allocation Information **/
+        List<HIPI_Contract_Associate_UI__c> alcd =  new List<HIPI_Contract_Associate_UI__c>();
+        alcd = [select Id from HIPI_Contract_Associate_UI__c where Contract__c IN: contId1 ];
+        if(alcd.size()>0)
+        DELETE alcd;
+        system.debug('Allocation Information >>>>> to be deleted' + alcd);
+        /** end To Delete the Allocation Information **/
+        
+        /** To Delete the Contract Parties **/
+        set<Id> ConPartyId = new set<Id>();
+        List<HIPI_Contract_Account__c> ConParty =  new List<HIPI_Contract_Account__c>();
+        List<HIPI_Contract_Account_Address__c> ConAddPrt =  new List<HIPI_Contract_Account_Address__c>();
+        List<HIPI_Contract_Account_Contact__c> ConAccCon =  new List<HIPI_Contract_Account_Contact__c>();
+        ConParty = [select Id from HIPI_Contract_Account__c where Contract__c IN: contId1 ];
+        //SELECT Id from HIPI_Contract_Account_Address__c where Contract_Account__c IN : ConParty
+        for(HIPI_Contract_Account__c ca : ConParty) {
+                ConPartyId.add(ca.id);
+        }
+        ConAddPrt = [select Id from HIPI_Contract_Account_Address__c where Contract_Account__c IN: ConPartyId];
+        ConAccCon = [select Id from HIPI_Contract_Account_Contact__c where Contract_Account__c IN: ConPartyId]; 
+        if(ConAddPrt.size()>0)
+        DELETE ConAddPrt;       
+        if(ConAccCon.size()>0)
+        DELETE ConAccCon;
+        
+        if(ConParty.size()>0)
+        DELETE ConParty;        
+        system.debug('Contract Parties >>>>> to be deleted' + ConParty); 
+        /** end To Delete the Contract Parties **/
+
+        /* to delete the related List of Contract which fulfill the above criteria*/    
+
+        // code is to delete the Documents from Content Library
+        Set<ID> conDocId = new Set<ID>();
+        List<contentDocument> CD_ToDelete = new List<contentDocument>();
+
+        for (contentversion cv : contentDocId) {
+            
+            conDocId.add(cv.contentDocumentId);
+        }
+        if(conDocId !=null){
+        ContentWorkSpace libName =  new ContentWorkSpace();
+        libName = [Select Id from ContentWorkSpace where Name = 'HIPI Retention Library'];    
+        CD_ToDelete = [SELECT Id FROM contentDocument where Id IN : conDocId AND parentId =:libName.Id ];
+        Delete CD_ToDelete;
+        }
+        //Ended Code to delete the Docs from Content Library.
+        
+    }   
+            
+        
+  global void finish(Database.BatchableContext BC) {
+   system.debug('CD_ToDelete>>>>>>>>>>'); 
+ }
+}
